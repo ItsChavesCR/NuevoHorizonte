@@ -4,44 +4,46 @@ GO
 CREATE DATABASE Nuevo_Horizonte
 ON PRIMARY
 (NAME = 'Nuevo_Horizonte_data',
-FILENAME = 'C:\SQLData\Nuevo_Horizonte_data.Mdf',
-SIZE = 20MB,
-MAXSIZE = 50MB,
-FILEGROWTH= 2MB)
+FILENAME = 'C:\SQL_DATA\Nuevo_Horizonte_data.Mdf',
+SIZE = 100MB,
+MAXSIZE = 2GB,
+FILEGROWTH= 10MB)
 
 LOG ON
 (NAME = 'Nuevo_Horizonte_Log',
-FILENAME = 'C:\SQLLog\Nuevo_Horizonte_Log.Ldf',
-SIZE = 5MB,
-MAXSIZE = 10MB,
-FILEGROWTH= 1MB)
+FILENAME = 'C:\SQL_LOG\Nuevo_Horizonte_Log.Ldf',
+SIZE = 50MB,
+MAXSIZE = 1GB,
+FILEGROWTH= 5MB)
 GO
 
---Aaron y Gene
 
 CREATE TABLE AULA
 (
-Codigo_aula  INT,
+Codigo_aula  INT NOT NULL,
 Nombre VARCHAR (50) NOT NULL,
-Num_aula  INT, 
-Metros_aula FLOAT,
-Codigo_interno_asignatura  INT, 
+Num_aula  INT NOT NULL, 
+Metros_aula FLOAT NOT NULL,
+Dia varchar(50) NULL,
+Hora varchar(50) NOT NULL,
+Codigo_interno_asignatura  varchar(50) NOT NULL, 
 CONSTRAINT PK_Codigo_aula
-PRIMARY KEY (Codigo_aula),
-FOREIGN KEY (Codigo_interno_asignatura) REFERENCES  Asignatura (Codigo_interno) 
+PRIMARY KEY (Codigo_aula) ,
+FOREIGN KEY (Codigo_interno_asignatura) REFERENCES  ASIGNATURA (Codigo_Interno_Central) 
 )
 GO
 
-
+DROP TABLE AULA
+ 
 CREATE TABLE PROFESORES
 (
-    Codigo_interno INT,
-    Nombre VARCHAR(50),
-    Dirección VARCHAR(50),
-    Telefono INT,
-    Email VARCHAR(50),
-    DNI INT,
-    Num_Seguridad_Social INT,
+    Codigo_interno INT NOT NULL,
+    Nombre VARCHAR(50) NOT NULL,
+    Dirección VARCHAR(50) NULL,
+    Telefono INT NULL,
+    Email VARCHAR(50) NULL,
+    DNI INT NULL,
+    Num_Seguridad_Social INT NULL,
     CONSTRAINT PK_Codigo_interno 
 	PRIMARY KEY (Codigo_interno)
 );
@@ -52,9 +54,9 @@ execute sp_help Profesores
 
 CREATE TABLE NOMBRAMIENTO
 (
-    Codigo_nombramiento  INT,
-    fecha_inicio DATETIME,
-    fecha_fin DATETIME,
+    Codigo_nombramiento  INT NOT NULL,
+    fecha_inicio DATETIME NOT NULL,
+    fecha_fin DATETIME NOT NULL,
     CONSTRAINT PK_Codigo_nombramiento 
 	PRIMARY KEY (Codigo_nombramiento)
 );
@@ -93,15 +95,13 @@ CREATE TABLE PROFESOR_ASIGNATURA (
 GO
 ---Asignatura 
 CREATE TABLE ASIGNATURA (
-    Codigo_Interno_Central varchar (50) NOT NULL,
+    Codigo_Interno_Central VARCHAR(50) NOT NULL,
     Nombre VARCHAR(50) NOT NULL,
     Codigo_europeo INT NOT NULL,
-    Dia DATE NULL,
-    Hora TIME NOT NULL,
-    CONSTRAINT PK_ASIGNATURA 
-	PRIMARY KEY (Codigo_Interno_Central)
+    CONSTRAINT PK_ASIGNATURA PRIMARY KEY (Codigo_Interno_Central)
 );
 GO
+
 
 CREATE TABLE Carrera
 (Codigo_Carrera INT,
@@ -121,7 +121,7 @@ FOREIGN KEY (Codigo_Interno_Central) REFERENCES ASIGNATURA (Codigo_Interno_Centr
 
 
 ------------------------------------------------------------------------------
---Roy y Gerald
+
 
 --**********************************************************
 USE Nuevo_Horizonte
@@ -134,17 +134,8 @@ Email VARCHAR (75) not null)
 GO
 --**********************************************************
 USE Nuevo_Horizonte
-CREATE TABLE ASIGNATURA 
-(Codigo_Interno_Central  INT not null,
-Nombre VARCHAR (50) not null,
-Codigo_europeo int not null, 
-Dia Date null,
-Hora Time not null)
-GO
---**********************************************************
-USE Nuevo_Horizonte
 CREATE TABLE MATRICULA
-(Codigo_Matricula  INT not null,
+(Codigo_Matricula  INT identity(1, 1)not null,
 Estado BIT not null)
 GO
 --**********************************************************
@@ -175,13 +166,6 @@ ADD CONSTRAINT PK_CICLO_
  PRIMARY KEY (CodigoInterno_Central) 
 GO
 --**********************************************************
-USE Nuevo_Horizonte
-GO
-ALTER TABLE ASIGNATURA
-ADD CONSTRAINT PK_ASIGNATURA_Codigo_Interno
- PRIMARY KEY (Codigo_Interno_Central) 
-GO
---**********************************************************
 ALTER TABLE Matricula
 ADD Estudiante_Cedula INT NOT NULL;
 --**********************************************************
@@ -194,7 +178,7 @@ REFERENCES ESTUDIANTE (Cedula);
 GO
 --**********************************************************
 ALTER TABLE Matricula
-ADD Codigo_Asignatura INT NOT NULL;
+ADD Codigo_Asignatura varchar(50) NOT NULL;
 --**********************************************************
 USE Nuevo_Horizonte
 GO
@@ -207,7 +191,7 @@ GO
 USE Nuevo_Horizonte
 CREATE TABLE CICLO_ASIGNATURA 
 (Id_CicloAsignatura INT NOT NULL,
- CodigoAsignatura INT NOT NULL,
+ CodigoAsignatura varchar(50) NOT NULL,
  CodigoCiclo INT NOT NULL)
 GO
 --**********************************************************
@@ -235,77 +219,28 @@ REFERENCES CICLO (CodigoInterno_Central);
 GO
 --**********************************************************
 
-
-
-use Nuevo_Horizonte
-go
-CREATE TABLE Asignaturas (
- CODIGO_ASIGNATURA INT not null,
-    NOMBRE VARCHAR(50) not null,
-	DIA varchar(25) not null,
-	HORA varchar(25) not null
-);
-
 CREATE TABLE REQUISITO
 (
-CODIGO_REQUISITO int NOT NULL,
+CODIGO_REQUISITO int identity(1, 1) NOT NULL, --PUSE IDENTITY ESTE CODIGO
 NOMBRE_REQUISITO varchar(50) NOT NULL
 )
 GO
 
-CREATE TABLE Carrera 
-(
-CODIGO_CARRERA int NOT NULL,
-NOMBRE VARCHAR(50) NOT NULL
-)
-GO
-
-
-ALTER TABLE Asignaturas
-ADD CONSTRAINT PK_CODIGO_ASIGNATURAS
-PRIMARY KEY (CODIGO_ASIGNATURA)
-GO
-
-ALTER TABLE Carrera
-ADD CONSTRAINT PK_CODIGO_CARRERA
-PRIMARY KEY (CODIGO_CARRERA)
-GO
+DROP TABLE REQUISITO
 
 ALTER TABLE REQUISITO
 ADD CONSTRAINT PK_CODIGO_REQUISITO
 PRIMARY KEY (CODIGO_REQUISITO)
 GO
 
-CREATE TABLE Asignatura_Carrera (
-CODIGO_ASIGNATURA_CARRERA INT NOT NULL,
-    CODIGO_ASIGNATURA INT NOT NULL,
-    CODIGO_CARRERA INT NOT NULL
-);
-GO
-
--- Agregar llave foránea a la tabla intermedia Asignatura_Carrera para CODIGO_ASIGNATURA
-ALTER TABLE Asignatura_Carrera
-ADD CONSTRAINT FK_Asignatura_Carrera_Asignatura
-FOREIGN KEY (CODIGO_ASIGNATURA) REFERENCES Asignaturas(CODIGO_ASIGNATURA);
-GO
-
--- Agregar llave foránea a la tabla intermedia Asignatura_Carrera para CODIGO_CARRERA
-ALTER TABLE Asignatura_Carrera
-ADD CONSTRAINT FK_Asignatura_Carrera_Carrera
-FOREIGN KEY (CODIGO_CARRERA) REFERENCES Carrera(CODIGO_CARRERA);
-GO
-
-ALTER TABLE Asignatura_Carrera
-ADD CONSTRAINT PK_Asignatura_Carrera
-PRIMARY KEY (CODIGO_ASIGNATURA_CARRERA);
-GO
-
 CREATE TABLE Asignatura_Requisito (
 CODIGO_ASIGNATURA_REQUISITO INT NOT NULL,
-    CODIGO_ASIGNATURA INT NOT NULL,
-    CODIGO_REQUISITO INT NOT NULL
+    CODIGO_ASIGNATURA VARCHAR(50) NOT NULL,
+   CODIGO_REQUISITO int NOT NULL
 );
 GO
+
+drop table Asignatura_Requisito
 
 ALTER TABLE Asignatura_Requisito
 ADD CONSTRAINT PK_Asignatura_Requisito
@@ -315,7 +250,7 @@ GO
 -- Agregar llave foránea a la tabla intermedia Asignatura_Requisito para CODIGO_ASIGNATURA
 ALTER TABLE Asignatura_Requisito
 ADD CONSTRAINT FK_Asignatura_Requisito_Asignatura
-FOREIGN KEY (CODIGO_ASIGNATURA) REFERENCES Asignaturas(CODIGO_ASIGNATURA);
+FOREIGN KEY (CODIGO_ASIGNATURA) REFERENCES ASIGNATURA(Codigo_Interno_Central);
 GO
 
 -- Agregar llave foránea a la tabla intermedia Asignatura_Requisito para CODIGO_REQUISITO
@@ -333,7 +268,6 @@ exec sp_help REQUISITO
 exec sp_help Asignatura_Carrera
 exec sp_help Asignatura_Requisito
 exec sp_helpdb Nuevo_Horizonte
-
 
 
 
