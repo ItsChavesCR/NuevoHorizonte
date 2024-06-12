@@ -1,23 +1,18 @@
 USE Nuevo_Horizonte;
 GO
 
+INSERT INTO ASIGNATURA (Codigo_Interno_Central, Codigo_europeo, Nombre, Dia, Hora) VALUES
+('MAT01', 01, 'Matematicas I', 'Lunes', 'Primera'),
+('MAT02', 02, 'Matematicas II', 'Martes', 'Segunda');
 -- Insertar datos en la tabla Requisito
 INSERT INTO Requisito (NOMBRE_REQUISITO) VALUES
-('Fisica Basica'),
-('Quimica Basica');
+('Matematicas I');
 
 -- Insertar datos en la tabla Asignatura_Requisito
 use Nuevo_Horizonte
 go
-INSERT INTO Asignatura_Requisito (CODIGO_ASIGNATURA, CODIGO_REQUISITO) VALUES
-('F02', 'F01'),  -- Fisica requiere Fisica Basica
-('Q02', 'Q01');  -- Quimica requiere Quimica Basica
-go
-
-use Nuevo_Horizonte
-go
-INSERT INTO Asignatura_Requisito (CODIGO_ASIGNATURA, CODIGO_REQUISITO) VALUES
-('F02', 'M01');
+INSERT INTO Asignatura_Requisito ( CODIGO_ASIGNATURA_REQUISITO, CODIGO_ASIGNATURA, CODIGO_REQUISITO) VALUES
+(1, 'MAT02', 'MAT01'); --MATEMATICAS II REQUIERE MATEMATICAS I
 go
 
 CREATE PROCEDURE Sp_MatricularEstudiante
@@ -33,7 +28,7 @@ BEGIN
     FROM Asignatura_Requisito ar
     JOIN Matricula m ON ar.CODIGO_REQUISITO = m.Codigo_Asignatura
     WHERE ar.CODIGO_ASIGNATURA = @codigo_asignatura
-    AND m.Cedula_Estudiante = @cedula;
+    AND m.Estudiante_Cedula = @cedula;
 
     -- Contar el número de requisitos para la asignatura
     SELECT @total_requisitos = COUNT(*)
@@ -44,13 +39,13 @@ BEGIN
     IF @count = @total_requisitos
     BEGIN
         -- Verificar si la matrícula ya existe
-        IF EXISTS (SELECT 1 FROM Matricula WHERE Cedula_Estudiante = @cedula AND Codigo_Asignatura = @codigo_asignatura)
+        IF EXISTS (SELECT 1 FROM Matricula WHERE Estudiante_Cedula = @cedula AND Codigo_Asignatura = @codigo_asignatura)
         BEGIN
             PRINT 'El estudiante ya está matriculado en esta asignatura';
         END
         ELSE
         BEGIN
-            INSERT INTO Matricula (Cedula_Estudiante, Codigo_Asignatura, Estado)
+            INSERT INTO Matricula (Estudiante_Cedula, Codigo_Asignatura, Estado)
             VALUES (@cedula, @codigo_asignatura, 1);  
 			 PRINT 'Matricula registrada exitosamente';
         END
@@ -60,6 +55,7 @@ BEGIN
         PRINT 'No cumple con los requisitos';
     END
 END;
+
 
 -- Trigger para eliminar matrícula
 CREATE TRIGGER TRG_EliminarMatricula
@@ -84,16 +80,16 @@ GO
 --Insertar una matricula
 use Nuevo_Horizonte
 go
-EXEC Sp_MatricularEstudiante @cedula = 1001, @codigo_asignatura = 'F02';
+EXEC Sp_MatricularEstudiante @cedula = 1002, @codigo_asignatura = 'MAT02';
 go
 
 --Eliminar una matricula
 DELETE FROM MATRICULA
-WHERE Codigo_Matricula = 1;
+WHERE Codigo_Matricula = 4;
 
 -- Modificar la matrícula del estudiante con la cédula 1003 y la asignatura 'F01'
 UPDATE MATRICULA
-SET Codigo_Asignatura = 'M01'
+SET Codigo_Asignatura = 'MAT01'
 WHERE Codigo_Matricula = 3;
 
 use Nuevo_Horizonte
@@ -106,5 +102,4 @@ FROM Matricula
 WHERE Codigo_Asignatura = 'Q01';
 
 --Reinicar el codigo de asignatura_Requisito
-DBCC CHECKIDENT ('Asignatura_Requisito', RESEED, 0);
-
+DBCC CHECKIDENT ('MATRICULA', RESEED, 0);
