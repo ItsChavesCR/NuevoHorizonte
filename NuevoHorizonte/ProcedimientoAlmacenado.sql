@@ -22,70 +22,115 @@ GO
 -----------------------------------------------------------------------------------------------------------------------------------
 -----------------------------------------------------------Procedimieto Almacenados-------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------
-
--- ----------------Procedimiento almacenado SP_InsertarNombramientoProfesor--------------------------------------
+----------------------------Procedimiento almacenado SP_InsertarNombramientoProfesor--------------------------------
 CREATE PROCEDURE SP_InsertarNombramientoProfesor
     @CodigoNombramiento INT,
     @FechaInicio DATETIME,
     @FechaFin DATETIME,
     @CodigoProfesor INT,
-    @CodigoInternoCentral Varchar (50)
+    @CodigoInternoCentral VARCHAR(50)
 AS
 BEGIN
-    -- Verificar si el profesor ya tiene un nombramiento activo para la misma asignatura
-    IF EXISTS (
-        SELECT 1
-        FROM Profesores_Nombramiento PN
-        INNER JOIN Nombramiento N ON PN.Codigo_nombramiento = N.Codigo_nombramiento
-        WHERE PN.Codigo_interno = @CodigoProfesor
-            AND N.fecha_inicio <= @FechaFin
-            AND N.fecha_fin >= @FechaInicio
-    )
-    BEGIN
-        PRINT 'El profesor ya tiene un nombramiento activo para esta asignatura en el periodo especificado';
-        RETURN;
-    END
+    SET NOCOUNT ON;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-    -- Insertar el nuevo nombramiento
-    INSERT INTO NOMBRAMIENTO (Codigo_nombramiento, fecha_inicio, fecha_fin)
-    VALUES (@CodigoNombramiento, @FechaInicio, @FechaFin);
+        -- Verificar si el profesor ya tiene un nombramiento activo para la misma asignatura
+        IF EXISTS (
+            SELECT 1
+            FROM Profesores_Nombramiento PN
+            INNER JOIN Nombramiento N ON PN.Codigo_nombramiento = N.Codigo_nombramiento
+            WHERE PN.Codigo_interno = @CodigoProfesor
+                AND N.fecha_inicio <= @FechaFin
+                AND N.fecha_fin >= @FechaInicio
+        )
+        BEGIN
+            PRINT 'El profesor ya tiene un nombramiento activo para esta asignatura en el periodo especificado';
+            RETURN;
+        END
 
-    -- Insertar el registro en la tabla Profesores_Nombramiento
-    INSERT INTO Profesores_Nombramiento (Codigo_nombramiento, Codigo_interno)
-    VALUES (@CodigoNombramiento, @CodigoProfesor);
+        -- Verificar si el Codigo_nombramiento ya existe
+        IF EXISTS (SELECT 1 FROM NOMBRAMIENTO WHERE Codigo_nombramiento = @CodigoNombramiento)
+        BEGIN
+            PRINT 'El Código de Nombramiento ya existe. Por favor, use un código diferente.';
+            RETURN;
+        END
 
-    PRINT '¡Nombramiento registrado correctamente!';
+        -- Insertar el nuevo nombramiento
+        INSERT INTO NOMBRAMIENTO (Codigo_nombramiento, fecha_inicio, fecha_fin)
+        VALUES (@CodigoNombramiento, @FechaInicio, @FechaFin);
+
+        -- Insertar el registro en la tabla Profesores_Nombramiento
+        INSERT INTO Profesores_Nombramiento (Codigo_nombramiento, Codigo_interno)
+        VALUES (@CodigoNombramiento, @CodigoProfesor);
+
+        COMMIT TRANSACTION;
+        PRINT '¡Nombramiento registrado correctamente!';
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        PRINT 'Error: ' + ERROR_MESSAGE();
+    END CATCH
 END
-GO
 
--------------------------------------------Sp_AniosImpartidos-----------------------------------------------------------
---Procedimiento almacenado SP_CalcularAniosImpartiendo
-CREATE PROCEDURE SP_CalcularAniosImpartiendo
+
+
+-------------------------------------------------------------------------------------------------------------------
+--------------------------Procedimiento almacenado SP_CalcularAniosImpartiendo-----------------------------------------
+CREATE PROCEDURE SP_CalcularAniosImpartiendos
     @CodigoProfesor INT,
     @CodigoNombramiento INT,
     @CodigoInternoCentral INT
 AS
 BEGIN
-    DECLARE @FechaInicio DATETIME, @AnioActual INT, @AniosImpartiendo INT;
-
-    SELECT @FechaInicio = fecha_inicio
+    DECLARE @FechaInicio DATETIME,
+	@FechaFin DATETIME,
+	@Anios INT, 
+	@Meses INT,
+	@TotalMeses INT;
+    
+    SELECT @FechaInicio = fecha_inicio, @FechaFin = fecha_fin
     FROM Nombramiento
     WHERE Codigo_nombramiento = @CodigoNombramiento;
+    
+    IF @FechaInicio IS NULL OR @FechaFin IS NULL
+    BEGIN
+        PRINT CONCAT('No se encontraron datos para el profesor con código interno ', @CodigoProfesor, ' y nombramiento ', @CodigoNombramiento);
+        RETURN;
+    END
 
-    SET @AnioActual = YEAR(GETDATE());
+    SET @TotalMeses = DATEDIFF(MONTH, @FechaInicio, @FechaFin);
+    
+    -- Si no se ha completado el último mes, restamos uno
+    IF DAY(@FechaInicio) > DAY(@FechaFin)
+    BEGIN
+        SET @TotalMeses = @TotalMeses - 1;
+    END
 
-    -- Calcular los años que el profesor ha impartido la asignatura
-    SET @AniosImpartiendo = @AnioActual - YEAR(@FechaInicio);
+    SET @Anios = @TotalMeses / 12;
+    SET @Meses = @TotalMeses % 12;
 
-    -- Actualizar la columna AniosImpartiendo en la tabla Profesores_Nombramiento
     UPDATE Profesores_Nombramiento
-    SET AniosImpartiendo = @AniosImpartiendo
+    SET AniosImpartiendo = @Anios
     WHERE Codigo_interno = @CodigoProfesor
         AND Codigo_nombramiento = @CodigoNombramiento;
-
-    PRINT CONCAT('El profesor con código interno ', @CodigoProfesor, ' ha impartido la asignatura durante ', @AniosImpartiendo, ' años.');
+    
+    IF @@ROWCOUNT = 0
+    BEGIN
+        PRINT CONCAT('No se encontró relación entre el profesor ', @CodigoProfesor, ' y el nombramiento ', @CodigoNombramiento, ' en Profesores_Nombramiento.');
+    END
+    ELSE
+    BEGIN
+        IF @Anios > 0 AND @Meses > 0
+            PRINT CONCAT('El profesor con código interno ', @CodigoProfesor, ' ha impartido la asignatura durante ', @Anios, ' año(s) y ', @Meses, ' mes(es).');
+        ELSE IF @Anios > 0
+            PRINT CONCAT('El profesor con código interno ', @CodigoProfesor, ' ha impartido la asignatura durante ', @Anios, ' año(s).');
+        ELSE IF @Meses > 0
+            PRINT CONCAT('El profesor con código interno ', @CodigoProfesor, ' ha impartido la asignatura durante ', @Meses, ' mes(es).');
+        ELSE
+            PRINT CONCAT('El profesor con código interno ', @CodigoProfesor, ' ha impartido la asignatura por menos de un mes.');
+    END
 END
-GO
 
 ----------------------------------------------------Sp_ProfesorAsignatura-------------------------------------
 -- Procedimiento almacenado SP_AsignarProfesorAsignatura
