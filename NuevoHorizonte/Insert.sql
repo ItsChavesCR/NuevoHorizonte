@@ -30,11 +30,11 @@ EXEC SP_InsertarNombramientoProfesor @CodigoNombramiento = 5, @FechaInicio = '20
 
 GO
 
--- Intentar insertar un nombramiento ya ocupado
+-- Intentar insertar un nombramiento ya activo
 EXEC SP_InsertarNombramientoProfesor @CodigoNombramiento = 4, @FechaInicio = '2020-06-01', @FechaFin = '2020-12-31', @CodigoProfesor = 1, @CodigoInternoCentral = 1;
 GO
 
--- Calcular años impartiendos
+-- Calcular años impartidos
 EXEC SP_CalcularAniosImpartiendo @CodigoProfesor = 1, @CodigoNombramiento = 1, @CodigoInternoCentral = 1;
 EXEC SP_CalcularAniosImpartiendo @CodigoProfesor = 2, @CodigoNombramiento = 3, @CodigoInternoCentral = 1;
 EXEC SP_CalcularAniosImpartiendo @CodigoProfesor = 3, @CodigoNombramiento = 4, @CodigoInternoCentral = 3;
