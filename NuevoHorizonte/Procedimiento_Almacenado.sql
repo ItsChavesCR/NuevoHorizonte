@@ -1,27 +1,102 @@
-------------------------------- Trigger TR_InsertarProfesorAsignatura----------------------------------------
-CREATE TRIGGER TR_InsertarProfesorAsignatura
-ON Profesores
-AFTER INSERT
+
+-------Procedimiento almacenado para insertar datos en Asignatura_Ciclo----------
+CREATE PROCEDURE InsertarAsignaturaCiclo
+    @codigo_asignatura_ciclo INT,
+    @codigo_interno_asignatura Varchar(50),
+    @codigo_interno_central_ciclo INT
 AS
 BEGIN
-    SET NOCOUNT ON;
-
-    DECLARE @CodigoProfesor INT;
-    DECLARE @DniProfesor INT;
-
-    SELECT @CodigoProfesor = Codigo_interno, @DniProfesor = DNI
-    FROM inserted;
-
-    INSERT INTO PROFESOR_ASIGNATURA (Codigo_interno_profesor, Codigo_Interno_Central)
-    VALUES (@CodigoProfesor, 1); 
-
-    PRINT 'Registro insertado en la tabla PROFESOR_ASIGNATURA';
-END
+    -- Verificar si la asignatura existe
+    IF EXISTS (SELECT 1 FROM Asignatura WHERE Codigo_Interno_Central = @codigo_interno_asignatura)
+    BEGIN
+        -- Verificar si el ciclo existe
+        IF EXISTS (SELECT 1 FROM CICLO WHERE CodigoInterno_Central = @codigo_interno_central_ciclo)
+        BEGIN
+            -- Insertar en Asignatura_Ciclo si no existe la combinación única
+            IF NOT EXISTS (SELECT 1 FROM CICLO_ASIGNATURA WHERE CodigoAsignatura = @codigo_interno_asignatura AND CodigoCiclo = @codigo_interno_central_ciclo)
+            BEGIN
+                INSERT INTO CICLO_ASIGNATURA(Id_CicloAsignatura, CodigoAsignatura, CodigoCiclo)
+                VALUES (@codigo_asignatura_ciclo, @codigo_interno_asignatura, @codigo_interno_central_ciclo);
+            END
+            ELSE
+            BEGIN
+                PRINT 'La combinación de asignatura y ciclo ya existe.';
+            END
+        END
+        ELSE
+        BEGIN
+            PRINT 'El ciclo no existe.';
+        END
+    END
+    ELSE
+    BEGIN
+        PRINT 'La asignatura no existe.';
+    END
+END;
 GO
 
------------------------------------------------------------------------------------------------------------------------------------
------------------------------------------------------------Procedimieto Almacenados-------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------------
+SELECT * FROM ASIGNATURA
+SELECT * FROM CICLO_ASIGNATURA
+
+
+-----------------------------------SP_InsertarAsignacionAula-------------
+
+CREATE PROCEDURE SP_InsertarAsignacionAula
+    @CodigoInternoCentral VARCHAR(50),
+    @NombreAsignatura VARCHAR(50),
+    @CodigoEuropeo INT,
+    @Dia VARCHAR(50),
+    @Hora VARCHAR(50),
+    @CodigoAula INT,
+    @NombreAula VARCHAR(50),
+    @NumAula INT,
+    @MetrosAula FLOAT
+AS
+BEGIN
+    -- Verificar si la hora es válida
+    IF @Hora NOT IN ('Primera Hora', 'Segunda Hora', 'Tercera Hora', 'Cuarta Hora', 'Quinta Hora', 'Sexta Hora')
+    BEGIN
+        RAISERROR ('La etiqueta de la hora es inválida. Use "Primera Hora", "Segunda Hora". Solo se permiten seis horas por día', 16, 1);
+        RETURN;
+    END
+
+    -- Verificar si el aula ya está ocupada en el mismo día y hora
+    IF EXISTS (
+        SELECT 1
+        FROM AULA
+        WHERE Dia = @Dia AND Hora = @Hora AND @NumAula = @NumAula
+    )
+    BEGIN
+        RAISERROR ('Error: El aula ya está reservada para ese día y esa hora.', 16, 1);
+        RETURN;
+    END
+
+    -- Insertar en la tabla ASIGNATURA si no existe
+    IF NOT EXISTS (
+        SELECT 1
+        FROM ASIGNATURA
+        WHERE Codigo_Interno_Central = @CodigoInternoCentral
+    )
+    BEGIN
+        INSERT INTO ASIGNATURA (Codigo_Interno_Central, Nombre, Codigo_europeo)
+        VALUES (@CodigoInternoCentral, @NombreAsignatura, @CodigoEuropeo);
+    END
+
+    -- Insertar en la tabla AULA
+    INSERT INTO AULA (Codigo_aula, Nombre, Num_aula, Metros_aula, Dia, Hora, Codigo_interno_asignatura)
+    VALUES (@CodigoAula, @NombreAula, @NumAula, @MetrosAula, @Dia, @Hora, @CodigoInternoCentral);
+
+    RAISERROR ('Registrado con éxito.', 16, 1);
+END
+GO 
+
+-------JOIN ----------
+SELECT A.Codigo_Interno_Central, A.Nombre AS NombreAsignatura, A.Codigo_europeo, 
+       AU.Dia, AU.Hora, AU.Codigo_aula, AU.Nombre AS NombreAula, AU.Num_aula, AU.Metros_aula
+FROM ASIGNATURA A
+JOIN AULA AU ON A.Codigo_Interno_Central = AU.Codigo_interno_asignatura;
+
+
 ----------------------------Procedimiento almacenado SP_InsertarNombramientoProfesor--------------------------------
 CREATE PROCEDURE SP_InsertarNombramientoProfesor
     @CodigoNombramiento INT,
@@ -77,7 +152,7 @@ END
 
 -------------------------------------------------------------------------------------------------------------------
 --------------------------Procedimiento almacenado SP_CalcularAniosImpartiendo-----------------------------------------
-CREATE PROCEDURE SP_CalcularAniosImpartiendos
+CREATE PROCEDURE SP_CalcularAniosImpartidos
     @CodigoProfesor INT,
     @CodigoNombramiento INT,
     @CodigoInternoCentral INT
@@ -205,73 +280,45 @@ BEGIN
 END
 GO
 
-------------------------------------Sp_OcupacionAula-----------------------------------------------------
-CREATE PROCEDURE sp_GestionarOcupacionAula
-    @Codigo_aula INT,
-    @Codigo_interno_asignatura INT,
-    @Dia VARCHAR(10),
-    @Hora VARCHAR(20)
+----------------------------------------------------------------------
+-----------------------------Sp_MatricularEstudiante--------------
+CREATE PROCEDURE Sp_MatricularEstudiante
+    @cedula INT,
+    @codigo_asignatura VARCHAR(25)
 AS
 BEGIN
-    -- Verificar si el aula ya está ocupada en el mismo día y hora
-    IF EXISTS (
-        SELECT 1
-        FROM AULA
-        WHERE Codigo_aula = @Codigo_aula
-        AND Dia = @Dia
-        AND Hora = @Hora
-    )
+    DECLARE @count INT;
+    DECLARE @total_requisitos INT;
+
+    -- Comprobar si el estudiante cumple con los requisitos
+    SELECT @count = COUNT(*)
+    FROM Asignatura_Requisito ar
+    JOIN Matricula m ON ar.CODIGO_REQUISITO = m.Codigo_Asignatura
+    WHERE ar.CODIGO_ASIGNATURA = @codigo_asignatura
+    AND m.Cedula_Estudiante = @cedula;
+
+    -- Contar el número de requisitos para la asignatura
+    SELECT @total_requisitos = COUNT(*)
+    FROM Asignatura_Requisito
+    WHERE CODIGO_ASIGNATURA = @codigo_asignatura;
+
+    -- Si el estudiante ha cumplido todos los requisitos, permitir la matrícula
+    IF @count = @total_requisitos
     BEGIN
-        RAISERROR('El aula ya está ocupada en esta fecha y hora.', 16, 1);
-        RETURN;
+        -- Verificar si la matrícula ya existe
+        IF EXISTS (SELECT 1 FROM Matricula WHERE Cedula_Estudiante = @cedula AND Codigo_Asignatura = @codigo_asignatura)
+        BEGIN
+            PRINT 'El estudiante ya está matriculado en esta asignatura';
+        END
+        ELSE
+        BEGIN
+            INSERT INTO Matricula (Cedula_Estudiante, Codigo_Asignatura, Estado)
+            VALUES (@cedula, @codigo_asignatura, 1);  
+			 PRINT 'Matricula registrada exitosamente';
+        END
     END
-
-    -- Actualizar o insertar la ocupación en la tabla AULA
-    UPDATE AULA
-    SET Codigo_interno_asignatura = @Codigo_interno_asignatura, Dia = @Dia, Hora = @Hora
-    WHERE Codigo_aula = @Codigo_aula;
-
-    -- Verificar si la actualización afectó alguna fila
-    IF @@ROWCOUNT = 0
+    ELSE
     BEGIN
-        RAISERROR('No se encontró el aula especificada.', 16, 1);
+        PRINT 'No cumple con los requisitos';
     END
 END;
-GO
-
-
--- Insertar datos en la tabla ASIGNATURA
-USE Nuevo_Horizonte;
-GO
-INSERT INTO ASIGNATURA (Codigo_Interno_Central, Nombre, Codigo_europeo, Dia, Hora)
-VALUES (1, 'Matemáticas', 1001, 'Lunes', 'Primera');
-
-INSERT INTO ASIGNATURA (Codigo_Interno_Central, Nombre, Codigo_europeo, Dia, Hora)
-VALUES (2, 'Historia', 1002, 'Martes', 'Segunda');
-
-
--- Insertar datos en la tabla AULA
-USE Nuevo_Horizonte;
-GO
-INSERT INTO AULA (Codigo_aula, Nombre, Num_aula, Metros_aula)
-VALUES (1, 'Aula 101', 101, 30.5);
-
-INSERT INTO AULA (Codigo_aula, Nombre, Num_aula, Metros_aula)
-VALUES (2, 'Aula 102', 102, 40.0);
-
--- Asignar la asignatura 'Matemáticas' al 'Aula 101' el 'Lunes' en la 'Primera' hora
-USE Nuevo_Horizonte2;
-GO
-EXEC sp_GestionarOcupacionAula @Codigo_aula = 1, @Codigo_interno_asignatura = 1, @Dia = 'Lunes', @Hora = 'Primera';
-
--- Intentar asignar otra asignatura al mismo aula en el mismo horario para verificar la restricción
-EXEC sp_GestionarOcupacionAula @Codigo_aula = 1, @Codigo_interno_asignatura = 2, @Dia = 'Lunes', @Hora = 'Primera';
--- Esto debería arrojar un error indicando que el aula ya está ocupada en esa fecha y hora
-
--- Asignar la asignatura 'Historia' al 'Aula 102' el 'Martes' en la 'Segunda' hora
-EXEC sp_GestionarOcupacionAula @Codigo_aula = 2, @Codigo_interno_asignatura = 2, @Dia = 'Martes', @Hora = 'Segunda';
-
--- Verificar los datos actualizados en la tabla AULA
-USE Nuevo_Horizonte2;
-GO
-SELECT * FROM AULA;
